@@ -2,11 +2,9 @@
 #ifndef __RBLM_PRIVATE_H__
 #define __RBLM_PRIVATE_H__
 
-#include <glib.h>
-#include <ruby.h>
-#include <loudmouth/loudmouth.h>
+#include "rblm.h"
 
-#define GBOOL2RVAL(x) (x == TRUE ? Qtrue : Qfalse)
+#define GBOOL2RVAL(x) ((x) == TRUE ? Qtrue : Qfalse)
 #define RVAL2GBOOL(x) RTEST(x)
 
 #define LMMESSAGENODE2RVAL(x) (rb_lm_message_node_to_ruby_object(x))
@@ -22,6 +20,7 @@ VALUE               rb_lm_ssl_to_ruby_object          (LmSSL         *ssl);
 VALUE               rb_lm_proxy_to_ruby_object        (LmProxy       *proxy);
 
 LmConnection *      rb_lm_connection_from_ruby_object         (VALUE obj);
+LmConnection *      rb_lm_ev_connection_from_ruby_object      (VALUE obj);
 LmMessage *         rb_lm_message_from_ruby_object            (VALUE obj);
 LmMessageNode *     rb_lm_message_node_from_ruby_object       (VALUE obj);
 LmSSL *             rb_lm_ssl_from_ruby_object                (VALUE obj);
