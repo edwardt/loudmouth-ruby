@@ -39,6 +39,20 @@
 #include "rblm.h"
 #include <loudmouth/loudmouth.h>
 
+/* Call Loudmouth API with no return value from ruby thread */
+#define LM_CALL(func) {                      \
+                        rb2lm_pause_glib();  \
+                        (func);              \
+                        rb2lm_resume_glib(); \
+                      }
+
+/* Call Loudmouth API with return value from ruby thread */
+#define LM_CALL2(func, res) {                      \
+                              rb2lm_pause_glib();  \
+                              res = (func);        \
+                              rb2lm_resume_glib(); \
+                            }
+
 /* Pipes used to notify of pending queue items */
 extern GIOChannel* rb2lm_read;
 extern GIOChannel* rb2lm_write;

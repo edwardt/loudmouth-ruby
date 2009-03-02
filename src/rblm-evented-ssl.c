@@ -21,7 +21,7 @@ rb_lm_ev_ssl_from_ruby_object (VALUE obj)
 void
 ev_ssl_free (LmSSL *ssl)
 {
-	lm_ssl_unref (ssl);
+	LM_CALL (lm_ssl_unref (ssl));
 }
 
 VALUE
@@ -45,7 +45,9 @@ ev_ssl_allocate (VALUE klass)
 static VALUE
 ev_ssl_is_supported (VALUE self)
 {
-	return GBOOL2RVAL (lm_ssl_is_supported ());
+        gboolean res;
+        LM_CALL2 (lm_ssl_is_supported (), res);
+        return GBOOL2RVAL (res);
 }
 
 static VALUE
@@ -75,10 +77,11 @@ ev_ssl_initialize (int argc, VALUE *argv, VALUE self)
 		fingerprint_str = StringValuePtr (str_val);
 	}
 
-	ssl = lm_ssl_new (fingerprint_str, /* expected_fingerprint */
-                          ssl_handler,     /* ssl_function         */
-			  func_ptr,        /* user_data            */
-                          NULL);           /* notify               */
+	LM_CALL2 (lm_ssl_new (fingerprint_str, /* expected_fingerprint */
+                          ssl_handler,         /* ssl_function         */
+			  func_ptr,            /* user_data            */
+                          NULL),               /* notify               */
+                  ssl);
 
 	DATA_PTR (self) = ssl;
 
@@ -90,8 +93,10 @@ ev_ssl_get_fingerprint (VALUE self)
 {
 	LmSSL *ssl = rb_lm_ev_ssl_from_ruby_object (self);
 
-	if (lm_ssl_get_fingerprint (ssl)) {
-		return rb_str_new2 (lm_ssl_get_fingerprint (ssl));
+        const gchar* res = NULL;
+        LM_CALL2 (lm_ssl_get_fingerprint (ssl), res);
+	if (res) {
+		return rb_str_new2 (res);
 	}
 
 	return Qnil;
@@ -101,8 +106,10 @@ static VALUE
 ev_ssl_get_use_starttls (VALUE self)
 {
 	LmSSL *ssl = rb_lm_ev_ssl_from_ruby_object (self);
+        gboolean res;
+        LM_CALL2 (lm_ssl_get_use_starttls (ssl), res);
 
-	return GBOOL2RVAL (lm_ssl_get_use_starttls (ssl));
+	return GBOOL2RVAL (res);
 }
 
 static VALUE
@@ -110,9 +117,11 @@ ev_ssl_set_use_starttls (VALUE self, VALUE use)
 {
 	LmSSL *ssl = rb_lm_ev_ssl_from_ruby_object (self);
 
-	lm_ssl_use_starttls (ssl,
+        gboolean require;
+        LM_CALL2 (lm_ssl_get_require_starttls (ssl), require);
+	LM_CALL (lm_ssl_use_starttls (ssl,
 			     RVAL2GBOOL (use),
-			     lm_ssl_get_require_starttls (ssl));
+			     require));
 
 	return Qnil;
 }
@@ -121,8 +130,10 @@ static VALUE
 ev_ssl_get_require_starttls (VALUE self)
 {
 	LmSSL *ssl = rb_lm_ev_ssl_from_ruby_object (self);
+        gboolean res;
+        LM_CALL2 (lm_ssl_get_require_starttls (ssl), res);
 
-	return GBOOL2RVAL (lm_ssl_get_require_starttls (ssl));
+        return GBOOL2RVAL (res);
 }
 
 static VALUE
@@ -130,9 +141,9 @@ ev_ssl_set_require_starttls (VALUE self, VALUE require)
 {
 	LmSSL *ssl = rb_lm_ev_ssl_from_ruby_object (self);
 
-	lm_ssl_use_starttls (ssl,
+	LM_CALL (lm_ssl_use_starttls (ssl,
 			     lm_ssl_get_use_starttls (ssl),
-			     RVAL2GBOOL (require));
+			     RVAL2GBOOL (require)));
 
 	return Qnil;
 }

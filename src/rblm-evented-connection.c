@@ -5,18 +5,6 @@
 #include <string.h>
 #include <errno.h>
 
-#define LM_CALL(func) {                      \
-                        rb2lm_pause_glib();  \
-                        (func);              \
-                        rb2lm_resume_glib(); \
-                      }
-
-#define LM_CALL2(func, res) {                      \
-                              rb2lm_pause_glib();  \
-                              res = (func);        \
-                              rb2lm_resume_glib(); \
-                            }
-
 VALUE lm_cEventedConnection;
 
 static VALUE Copen_block;
@@ -302,14 +290,14 @@ ev_conn_get_ssl (VALUE self)
 
     LmSSL * ssl = NULL;
     LM_CALL2 (lm_connection_get_ssl (conn), ssl);
-    return LMSSL2RVAL (ssl);
+    return LMEVENTEDSSL2RVAL (ssl);
 }
 
 static VALUE
 ev_conn_set_ssl (VALUE self, VALUE ssl_rval)
 {
     LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
-    LmSSL        *ssl  = rb_lm_ssl_from_ruby_object (ssl_rval);
+    LmSSL        *ssl  = rb_lm_ev_ssl_from_ruby_object (ssl_rval);
 
     LM_CALL (lm_connection_set_ssl (conn, ssl));
 
