@@ -1,6 +1,5 @@
 #include "rblm.h"
 #include "rblm-private.h"
-#include "rblm-synchronizer.h"
 
 VALUE lm_cSSL;
 
@@ -48,6 +47,23 @@ ssl_is_supported (VALUE self)
 	return GBOOL2RVAL (lm_ssl_is_supported ());
 }
 
+static LmSSLResponse
+ssl_func_callback (LmSSL       *ssl,
+		   LmSSLStatus  status,
+		   gpointer     user_data)
+{
+	VALUE response;
+
+	if (!user_data) {
+		return LM_SSL_RESPONSE_CONTINUE;
+	}
+
+	response = rb_funcall ((VALUE)user_data, rb_intern ("call"), 1,
+			       INT2FIX (status));
+
+	return rb_lm_ssl_response_from_ruby_object (response);
+}
+
 static VALUE
 ssl_initialize (int argc, VALUE *argv, VALUE self)
 {
@@ -75,10 +91,8 @@ ssl_initialize (int argc, VALUE *argv, VALUE self)
 		fingerprint_str = StringValuePtr (str_val);
 	}
 
-	ssl = lm_ssl_new (fingerprint_str, /* expected_fingerprint */
-                          ssl_handler,     /* ssl_function         */
-			  func_ptr,        /* user_data            */
-                          NULL);           /* notify               */
+	ssl = lm_ssl_new (fingerprint_str, ssl_func_callback,
+			  func_ptr, NULL);
 
 	DATA_PTR (self) = ssl;
 

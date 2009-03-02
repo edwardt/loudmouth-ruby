@@ -13,6 +13,7 @@ Init_loudmouth (void)
 	Init_lm_message_node (lm_mLM);
 	Init_lm_constants (lm_mLM);
 	Init_lm_ssl (lm_mLM);
+        Init_lm_evented_ssl (lm_mLM);
 	Init_lm_proxy (lm_mLM);
         Init_lm_callback (lm_mLM);
         Init_lm_sink (lm_mLM);
