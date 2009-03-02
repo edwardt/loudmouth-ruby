@@ -16,6 +16,7 @@ describe "Basic LM::Message" do
     conn.jid = 'vertebra-client@localhost'
 
     conn.set_disconnect_handler do |reason|
+      puts "Disconnected"
       main_loop.quit
     end
 
@@ -25,6 +26,7 @@ describe "Basic LM::Message" do
           unless auth_result
             puts "Failed to authenticate"
           else
+            puts "Authenticated"
             m = LM::Message.new('vertebra-client@localhost/agent', LM::MessageType::IQ)
             m.node.value = "<op></op>"
             conn.send(m) do |answer|
