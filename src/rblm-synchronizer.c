@@ -119,29 +119,33 @@ loop_thread(gpointer _) {
 
 /* Initialize queues, pipes and the GLib event loop, call from ruby thread */
 void
-rblm_init_sync() {
-    g_thread_init(NULL);
-    event_loop_started = g_cond_new();
-    event_loop_started_mx = g_mutex_new();
+rblm_init_sync()
+{
+    if (!glib_started)
+    {
+        g_thread_init(NULL);
+        event_loop_started = g_cond_new();
+        event_loop_started_mx = g_mutex_new();
 
-    rblm_create_pipe(&rb2lm_read, &rb2lm_write);
-    rblm_create_pipe(&lm2rb_read, &lm2rb_write);
+        rblm_create_pipe(&rb2lm_read, &rb2lm_write);
+        rblm_create_pipe(&lm2rb_read, &lm2rb_write);
 
-    lm2rb_queue = g_async_queue_new();
+        lm2rb_queue = g_async_queue_new();
 
-    GError* error = NULL;
-    glib_thread = g_thread_create((GThreadFunc) &loop_thread, /* func     */
-                                  NULL,                       /* data     */
-                                  TRUE,                       /* joinable */
-                                  &error);                    /* error    */
-    if (error) {
-        g_error("Could not start GLib thread: %s\n", error->message);
-        g_error_free(error);
+        GError* error = NULL;
+        glib_thread = g_thread_create((GThreadFunc) &loop_thread, /* func     */
+                                      NULL,                       /* data     */
+                                      TRUE,                       /* joinable */
+                                      &error);                    /* error    */
+        if (error) {
+            g_error("Could not start GLib thread: %s\n", error->message);
+            g_error_free(error);
+        }
+
+        /* Wait until main loop is running */
+        g_cond_wait (event_loop_started, event_loop_started_mx);
+        glib_started = TRUE;
     }
-    
-    /* Wait until main loop is running */
-    g_cond_wait (event_loop_started, event_loop_started_mx);
-    glib_started = TRUE;
 }
 
 /* Shut down synchronization layer, call from ruby thread */

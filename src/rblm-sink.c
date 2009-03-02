@@ -11,20 +11,9 @@ sink_free (void* _)
 }
 
 static VALUE
-sink_allocate (VALUE klass)
-{
-    return Data_Wrap_Struct (klass, NULL, sink_free, NULL);
-}
-
-static VALUE
-sink_initialize (int argc, VALUE *argv, VALUE self)
-{
-    rblm_init_sync();
-}
-
-static VALUE
 sink_file_descriptor (VALUE self)
 {
+    rblm_init_sync();
     return INT2NUM (g_io_channel_unix_get_fd (lm2rb_read));
 }
 
@@ -41,11 +30,12 @@ sink_notification (VALUE self)
 void
 Init_lm_sink (VALUE lm_mLM)
 {
+    VALUE cleanup_callback = Data_Wrap_Struct(rb_cObject, 0, sink_free, NULL);
+    rb_global_variable (&cleanup_callback);
+
     lm_cSink = rb_define_class_under (lm_mLM, "Sink", rb_cObject);
 
-    rb_define_alloc_func (lm_cSink, sink_allocate);
-    rb_define_method (lm_cSink, "initialize", sink_initialize, -1);
-    rb_define_method (lm_cSink, "file_descriptor", sink_file_descriptor, 0);
-    rb_define_method (lm_cSink, "notification", sink_notification, 0);
+    rb_define_singleton_method (lm_cSink, "file_descriptor", sink_file_descriptor, 0);
+    rb_define_singleton_method (lm_cSink, "notification", sink_notification, 0);
 }
 

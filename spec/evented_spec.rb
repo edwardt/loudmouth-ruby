@@ -6,19 +6,16 @@ if File.exist?(SO_PATH)
 else
   require File.dirname(__FILE__) + '/../loudmouth.bundle'
 end
-GC.disable
-puts "Creating connection"
+
 $conn = LM::EventedConnection.new
 $conn.jid = 'vertebra-client@localhost'
-puts "Creating sink"
-$sink = LM::Sink.new
 
 module CallbackHandler
 
   def notify_readable
     buf = ""
     $pipe_read.read(1, buf)
-    notification = $sink.notification
+    notification = LM::Sink.notification
     case notification.kind
     when LM::CB_CONN_OPEN
       handle_connection_open notification.data
@@ -68,8 +65,7 @@ module CallbackHandler
 end
 
 EM.run do
-  $pipe_read = IO.for_fd($sink.file_descriptor, "r")
-  EM.attach($sink.file_descriptor, CallbackHandler)
+  $pipe_read = IO.for_fd(LM::Sink.file_descriptor, "r")
+  EM.attach(LM::Sink.file_descriptor, CallbackHandler)
   $conn.open {}
-  puts "Reactor running"
 end
