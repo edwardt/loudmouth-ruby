@@ -20,6 +20,8 @@ sink_file_descriptor (VALUE self)
 static VALUE
 sink_notification (VALUE self)
 {
+    static gchar buf[1];
+    g_io_channel_read_chars(lm2rb_read, buf, 1, NULL, NULL);
     LmAsyncCallback* cb = (LmAsyncCallback*)g_async_queue_pop(lm2rb_queue);
     if (cb)
         return lm_callback_to_ruby_object (cb);
