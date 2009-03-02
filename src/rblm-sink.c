@@ -1,7 +1,6 @@
 #include "rblm.h"
 #include "rblm-callback.h"
 #include "rblm-synchronizer.h"
-#include "rblm-lm2rb.h"
 
 static VALUE lm_cSink;
 
@@ -30,14 +29,13 @@ sink_file_descriptor (VALUE self)
 }
 
 static VALUE
-sink_message (VALUE self)
+sink_notification (VALUE self)
 {
-    VALUE res = Qnil;
     LmAsyncCallback* cb = (LmAsyncCallback*)g_async_queue_pop(lm2rb_queue);
     if (cb)
-        res = lm_callback_to_ruby_object (cb);
-
-    return res;
+        return lm_callback_to_ruby_object (cb);
+    else
+        return Qnil;
 }
 
 void
@@ -48,6 +46,6 @@ Init_lm_sink (VALUE lm_mLM)
     rb_define_alloc_func (lm_cSink, sink_allocate);
     rb_define_method (lm_cSink, "initialize", sink_initialize, -1);
     rb_define_method (lm_cSink, "file_descriptor", sink_file_descriptor, 0);
-    rb_define_method (lm_cSink, "message", sink_message, 0);
+    rb_define_method (lm_cSink, "notification", sink_notification, 0);
 }
 

@@ -38,5 +38,8 @@ LmAsyncCallback* create_async_message (LmAsyncNotification notification,
                                        VALUE block,
                                        gpointer data);
 
+/* Create ruby object from raw async message */
+VALUE lm_callback_to_ruby_object (LmAsyncCallback* callback);
+
 #endif	/* _RBLM_CALLBACK_H */
 

@@ -37,6 +37,7 @@
 #define	_RBLM_SYNCHRONIZER_H
 
 #include "rblm.h"
+#include <loudmouth/loudmouth.h>
 
 /* Pipes used to notify of pending queue items */
 extern GIOChannel* rb2lm_read;
@@ -44,8 +45,8 @@ extern GIOChannel* rb2lm_write;
 extern GIOChannel* lm2rb_read;
 extern GIOChannel* lm2rb_write;
 
-/* GLib event loop main context */
-extern GMainContext* main_context;
+/* Asynchronous Message queue */
+extern GAsyncQueue* lm2rb_queue;
 
 /* Initialize queues, pipes and the GLib event loop, call from ruby thread */
 void rblm_init_sync();
@@ -53,8 +54,35 @@ void rblm_init_sync();
 /* Shut down synchronization layer, call from ruby thread */
 void rblm_shutdown_sync();
 
+/* Was the GLib thread started? (i.e. is synchronization necessary? */
+gboolean rblm_sync_started();
+
 /* Helper to create pipe and its channels */
 void rblm_create_pipe (GIOChannel** ch_read, GIOChannel** ch_write);
+
+/* 'Pause' GLib */
+void rb2lm_pause_glib();
+
+/* 'Resume' GLib */
+void rb2lm_resume_glib();
+
+/* Loudmouth event handlers */
+LmHandlerResult msg_handler (LmMessageHandler *handler, LmConnection *connection, LmMessage *message, gpointer user_data);
+LmHandlerResult reply_handler (LmMessageHandler *handler, LmConnection *connection, LmMessage *message, gpointer *user_data);
+void open_handler (LmConnection *conn, gboolean success, gpointer user_data);
+void auth_handler (LmConnection *conn, gboolean success, gpointer user_data);
+void disconnect_handler (LmConnection *conn, LmDisconnectReason  reason, gpointer user_data);
+LmSSLResponse ssl_handler (LmSSL *ssl, LmSSLStatus  status, gpointer user_data);
+
+/* Event packaging */
+#define MSG2GPOINTER(m)        ((gpointer)(m))
+#define GPOINTER2MSG(p)        ((LmMessage*)(p))
+#define GBOOL2GPOINTER(b)      ((b == TRUE) ? (void*)1 : NULL)
+#define GPOINTER2GBOOL(p)      (p ? TRUE : FALSE)
+#define DISCONNECT2GPOINTER(d) ((gpointer)(d))
+#define GPOINTER2DISCONNECT(p) ((LmDisconnectReason)(p))
+#define SSLSTATUS2GPOINTER(s)  ((gpointer)(s))
+#define GPOINTER2SSLSTATUS(p)  ((LmSSLStatus)(p))
 
 #endif	/* _RBLM_SYNCHRONIZER_H */
 

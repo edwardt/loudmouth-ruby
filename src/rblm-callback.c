@@ -5,158 +5,133 @@
 
 #include "rblm-callback.h"
 #include "rblm-private.h"
-#include "rblm-lm2rb.h"
+#include "rblm-synchronizer.h"
 #include <ruby.h>
 
-/* Ruby callback classes */
+/* Ruby callback class */
 VALUE lm_cCallback;
-VALUE lm_cMessageCallback;
-VALUE lm_cStatusCallback;
-VALUE lm_cDisconnectCallback;
-VALUE lm_cSslCallback;
 
 /* Create messages to be posted on async queue */
 LmAsyncCallback*
 create_async_message (LmAsyncNotification notification, VALUE block, gpointer data)
 {
-    LmAsyncCallback* cb = ALLOC (LmAsyncCallback);
+    LmAsyncCallback* cb = (LmAsyncCallback*)malloc (sizeof(LmAsyncCallback));
     cb->notification = notification;
     cb->block = block;
     cb->data = data;
+    return cb;
 }
 
-/* Ruby instance initialize */
+/* Free underlying async message */
+static void
+callback_free (LmAsyncCallback* cb)
+{
+    if (cb) free (cb);
+}
+
+/* Convert raw async message to ruby object */
 VALUE
+lm_callback_to_ruby_object (LmAsyncCallback* cb)
+{
+    if (cb)
+        return Data_Wrap_Struct (lm_cCallback, NULL, callback_free, cb);
+    else
+        return Qnil;
+}
+
+static VALUE
+callback_allocate (VALUE klass)
+{
+    return Data_Wrap_Struct (klass, NULL, callback_free, NULL);
+}
+
+static VALUE
 callback_initialize (int argc, VALUE *argv, VALUE self)
 {
-    VALUE target, msg_type;
-    rb_scan_args (argc, argv, "22", &target, &msg_type);
-
-    rb_iv_set (self, "@target", target);
-    rb_iv_set (self, "@msg_type", msg_type);
 }
 
-VALUE
-msg_callback_initialize (VALUE self, VALUE conn, VALUE message, VALUE msg_type)
+static LmAsyncCallback *
+rb_lm_callback_from_ruby_object (VALUE obj)
 {
-    VALUE args[2];
-    args[0] = conn;
-    args[1] = msg_type;
-    rb_call_super (2, args);
-    rb_iv_set (self, "@message", message);
+    LmAsyncCallback* cb = NULL;
+
+    if (!rb_lm__is_kind_of (obj, lm_cCallback))
+        rb_raise (rb_eTypeError, "not a LM::Callback");
+
+    Data_Get_Struct (obj, LmAsyncCallback, cb);
+
+    return cb;
 }
 
-VALUE
-status_callback_initialize (VALUE self, VALUE conn, VALUE success, VALUE msg_type)
+static VALUE
+callback_get_kind (VALUE self)
 {
-    VALUE args[2];
-    args[0] = conn;
-    args[1] = msg_type;
-    rb_call_super (2, args);
-    rb_iv_set (self, "@success", success);
+    LmAsyncCallback* cb = rb_lm_callback_from_ruby_object (self);
+
+    return INT2FIX (cb->notification);
 }
 
-VALUE
-disconnect_callback_initialize (VALUE self, VALUE conn, VALUE reason)
+static VALUE
+callback_get_target (VALUE self)
 {
-    VALUE args[2];
-    args[0] = conn;
-    args[1] = INT2FIX (LM_CB_DISCONNECT);
-    rb_call_super (2, args);
-    rb_iv_set (self, "@reason", reason);
+    LmAsyncCallback* cb = rb_lm_callback_from_ruby_object (self);
+
+    return cb->block;
 }
 
-VALUE
-ssl_callback_initialize (VALUE self, VALUE ssl, VALUE status)
+static VALUE
+callback_get_data (VALUE self)
 {
-    VALUE args[2];
-    args[0] = ssl;
-    args[1] = INT2FIX (LM_CB_SSL);
-    rb_call_super (2, args);
-    rb_iv_set (self, "@status", status);
-}
-
-/* Convert Loudmouth callback user data to ruby object */
-VALUE
-lm_callback_to_ruby_object (LmAsyncCallback* callback)
-{
-    if (!callback)
-        return Qnil;
+    LmAsyncCallback* cb = rb_lm_callback_from_ruby_object (self);
     VALUE res;
-    VALUE msg_type = INT2NUM (callback->notification);
-    switch (callback->notification)
+    switch (cb->notification)
     {
         case LM_CB_MSG:
         case LM_CB_REPLY:
         {
-            VALUE args[3];
-            args[0] = callback->block;
-            args[1] = LMMESSAGE2RVAL (GPOINTER2MSG (callback->data));
-            args[2] = msg_type;
-            res = rb_class_new_instance (3, args, lm_cMessageCallback);
+            res = LMMESSAGE2RVAL (GPOINTER2MSG (cb->data));
             break;
         }
         case LM_CB_CONN_OPEN:
         case LM_CB_AUTH:
         {
-            VALUE args[3];
-            args[0] = callback->block;
-            args[1] = GBOOL2RVAL (GPOINTER2GBOOL (callback->data));
-            args[2] = msg_type;
-            res = rb_class_new_instance (3, args, lm_cMessageCallback);
+            res = GBOOL2RVAL (GPOINTER2GBOOL (cb->data));
             break;
         }
         case LM_CB_DISCONNECT:
         {
-            VALUE args[2];
-            args[0] = callback->block;
-            args[1] = INT2FIX (GPOINTER2DISCONNECT (callback->data));
-            res = rb_class_new_instance (2, args, lm_cMessageCallback);
+            res = INT2FIX (GPOINTER2DISCONNECT (cb->data));
             break;
         }
         case LM_CB_SSL:
         {
-            VALUE args[2];
-            args[0] = callback->block;
-            args[1] = INT2FIX (GPOINTER2SSLSTATUS (callback->data));
-            res = rb_class_new_instance (2, args, lm_cSslCallback);
+            res = INT2FIX (GPOINTER2SSLSTATUS (cb->data));
             break;
         }
         default:
-            g_warning ("Unknown callback type '%d'\n", callback->notification);
+            g_warning ("Unknown callback type '%d'\n", cb->notification);
     }
 
     return res;
 }
 
+
 void
 Init_lm_callback(VALUE lm_mLM)
 {
     lm_cCallback = rb_define_class_under (lm_mLM, "Callback", rb_cObject);
+
+    rb_define_const (lm_mLM, "CB_MSG", INT2FIX (LM_CB_MSG));
+    rb_define_const (lm_mLM, "CB_REPLY", INT2FIX (LM_CB_REPLY));
+    rb_define_const (lm_mLM, "CB_CONN_OPEN", INT2FIX (LM_CB_CONN_OPEN));
+    rb_define_const (lm_mLM, "CB_AUTH", INT2FIX (LM_CB_AUTH));
+    rb_define_const (lm_mLM, "CB_DISCONNECT", INT2FIX (LM_CB_DISCONNECT));
+    rb_define_const (lm_mLM, "CB_SSL", INT2FIX (LM_CB_SSL));
+
+    rb_define_alloc_func (lm_cCallback, callback_allocate);
     rb_define_method (lm_cCallback, "initialize", callback_initialize, -1);
-    rb_define_const (lm_cCallback, "CB_MSG", INT2FIX (LM_CB_MSG));
-    rb_define_const (lm_cCallback, "CB_REPLY", INT2FIX (LM_CB_REPLY));
-    rb_define_const (lm_cCallback, "CB_CONN_OPEN", INT2FIX (LM_CB_CONN_OPEN));
-    rb_define_const (lm_cCallback, "CB_AUTH", INT2FIX (LM_CB_AUTH));
-    rb_define_const (lm_cCallback, "CB_DISCONNECT", INT2FIX (LM_CB_DISCONNECT));
-    rb_define_const (lm_cCallback, "CB_SSL", INT2FIX (LM_CB_SSL));
-    rb_define_attr (lm_cCallback, "target", 1, 0);
-    rb_define_attr (lm_cCallback, "msg_type", 1, 0);
-
-    lm_cMessageCallback = rb_define_class_under (lm_mLM, "MessageCallback", lm_cCallback);
-    rb_define_method (lm_cMessageCallback, "initialize", msg_callback_initialize, 3);
-    rb_define_attr (lm_cMessageCallback, "message", 1, 0);
-
-    lm_cStatusCallback = rb_define_class_under (lm_mLM, "StatusCallback", lm_cCallback);
-    rb_define_method (lm_cStatusCallback, "initialize", status_callback_initialize, 3);
-    rb_define_attr (lm_cMessageCallback, "success", 1, 0);
-
-    lm_cDisconnectCallback = rb_define_class_under (lm_mLM, "DisconnectCallback", lm_cCallback);
-    rb_define_method (lm_cDisconnectCallback, "initialize", disconnect_callback_initialize, 2);
-    rb_define_attr (lm_cMessageCallback, "reason", 1, 0);
-
-    lm_cSslCallback = rb_define_class_under (lm_mLM, "SslCallback", lm_cCallback);
-    rb_define_method (lm_cSslCallback, "initialize", ssl_callback_initialize, 2);
-    rb_define_attr (lm_cSslCallback, "status", 1, 0);
+    rb_define_method (lm_cCallback, "target", callback_get_target, 0);
+    rb_define_method (lm_cCallback, "kind", callback_get_kind, 0);
+    rb_define_method (lm_cCallback, "data", callback_get_data, 0);
 }
 

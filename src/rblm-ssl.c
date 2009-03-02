@@ -1,6 +1,6 @@
 #include "rblm.h"
 #include "rblm-private.h"
-#include "rblm-lm2rb.h"
+#include "rblm-synchronizer.h"
 
 VALUE lm_cSSL;
 

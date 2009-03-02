@@ -1,7 +1,6 @@
 #include "rblm.h"
 #include "rblm-private.h"
 #include "rblm-synchronizer.h"
-#include "rblm-lm2rb.h"
 #include "rblm-callback.h"
 #include <string.h>
 #include <errno.h>
@@ -31,6 +30,20 @@ static VALUE Cempty_block;
 static VALUE ev_conn_set_server (VALUE self, VALUE server);
 static VALUE _do_send_with_reply (VALUE self, LmConnection *conn, LmMessage *msg, VALUE block);
 
+LmConnection *
+rb_lm_ev_connection_from_ruby_object (VALUE obj)
+{
+	LmConnection *conn;
+
+	if (!rb_lm__is_kind_of (obj, lm_cEventedConnection)) {
+		rb_raise (rb_eTypeError, "not a LmConnection");
+	}
+
+	Data_Get_Struct (obj, LmConnection, conn);
+
+	return conn;
+}
+
 static void
 ev_conn_free (LmConnection *self)
 {
@@ -53,11 +66,11 @@ ev_conn_initialize (int argc, VALUE *argv, VALUE self)
     /* Initialize some static VALUE's which will point at stuff that will be
        accessed repeatedly. */
 
-    Copen_block       = rb_intern("@open_block");
-    Cauth_block       = rb_intern("@auth_block");
-    Cdisconnect_block = rb_intern("@disconnect_block");
-    Chandler_blocks   = rb_intern("@handler_blocks");
-    Csend_blocks      = rb_intern("@send_blocks");
+    Copen_block       = rb_intern ("@open_block");
+    Cauth_block       = rb_intern ("@auth_block");
+    Cdisconnect_block = rb_intern ("@disconnect_block");
+    Chandler_blocks   = rb_intern ("@handler_blocks");
+    Csend_blocks      = rb_intern ("@send_blocks");
 
     /* These data structures will track the blocks that are in use so that they
        don't get prematurey garbage collected. */
@@ -70,7 +83,7 @@ ev_conn_initialize (int argc, VALUE *argv, VALUE self)
 
     rb_scan_args (argc, argv, "01", &server);
 
-    LM_CALL2 (lm_connection_new_with_context (NULL, main_context), conn);
+    LM_CALL2 (lm_connection_new_with_context (NULL, g_main_context_default()), conn);
 
     DATA_PTR (self) = conn;
 
@@ -84,7 +97,7 @@ ev_conn_initialize (int argc, VALUE *argv, VALUE self)
 static VALUE
 ev_conn_open (int argc, VALUE *argv, VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
     VALUE         func;
 
     rb_scan_args (argc, argv, "0&", &func);
@@ -92,7 +105,7 @@ ev_conn_open (int argc, VALUE *argv, VALUE self)
 
     rb_ivar_set (self, Copen_block, func);
     gboolean res;
-    GError* error;
+    GError* error =  NULL;
     LM_CALL2 (lm_connection_open (conn,
                                   open_handler,
                                   (gpointer) func, /* user_data */
@@ -101,7 +114,7 @@ ev_conn_open (int argc, VALUE *argv, VALUE self)
               res);
     if (error)
     {
-        g_warning ("Could not open connection: %s", strerror (errno));
+        g_warning ("Could not open connection: %d, %d, %s", error->domain, error->code, error->message);
         g_error_free (error);
     }
     return GBOOL2RVAL (res);
@@ -110,7 +123,7 @@ ev_conn_open (int argc, VALUE *argv, VALUE self)
 static VALUE
 ev_conn_close (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     gboolean res;
     LM_CALL2 (lm_connection_close (conn, NULL), res);
@@ -121,7 +134,7 @@ ev_conn_close (VALUE self)
 static VALUE
 ev_conn_auth (int argc, VALUE *argv, VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
     VALUE         name, password, resource, func;
 
     rb_scan_args (argc, argv, "21&", &name, &password, &resource, &func);
@@ -150,13 +163,13 @@ ev_conn_auth (int argc, VALUE *argv, VALUE self)
 static VALUE
 ev_conn_auth_and_block (int argc, VALUE *argv, VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
     VALUE         name, password, resource;
 
     rb_scan_args (argc, argv, "21", &name, &password, &resource);
 
     gboolean res;
-    GError* error;
+    GError* error = NULL;
     LM_CALL2 (lm_connection_authenticate_and_block (conn,
                                                     StringValuePtr (name),
                                                     StringValuePtr (password),
@@ -174,7 +187,7 @@ ev_conn_auth_and_block (int argc, VALUE *argv, VALUE self)
 static VALUE
 ev_conn_set_keep_alive_rate (VALUE self, VALUE rate)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     LM_CALL (lm_connection_set_keep_alive_rate (conn, NUM2UINT (rate)));
 
@@ -184,7 +197,7 @@ ev_conn_set_keep_alive_rate (VALUE self, VALUE rate)
 /*static VALUE
 ev_conn_get_keep_alive_rate (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     guint rate = 0;
     LM_CALL2 (lm_connection_get_keep_alive_rate (conn), rate);
@@ -195,7 +208,7 @@ ev_conn_get_keep_alive_rate (VALUE self)
 static VALUE
 ev_conn_is_open (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     gboolean res;
     LM_CALL2 (lm_connection_is_open (conn), res);
@@ -205,7 +218,7 @@ ev_conn_is_open (VALUE self)
 static VALUE
 ev_conn_is_authenticated (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     gboolean res;
     LM_CALL2 (lm_connection_is_authenticated (conn), res);
@@ -215,7 +228,7 @@ ev_conn_is_authenticated (VALUE self)
 static VALUE
 ev_conn_get_server (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     const gchar* server = NULL;
     LM_CALL2 (lm_connection_get_server (conn), server)
@@ -225,7 +238,7 @@ ev_conn_get_server (VALUE self)
 static VALUE
 ev_conn_set_server (VALUE self, VALUE server)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     if (!rb_respond_to (server, rb_intern ("to_s"))) {
         rb_raise (rb_eArgError, "server should respond to to_s");
@@ -240,7 +253,7 @@ ev_conn_set_server (VALUE self, VALUE server)
 static VALUE
 ev_conn_get_jid (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     const gchar* jid = NULL;
     LM_CALL2 (lm_connection_get_jid (conn), jid)
@@ -250,7 +263,7 @@ ev_conn_get_jid (VALUE self)
 static VALUE
 ev_conn_set_jid (VALUE self, VALUE jid)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     if (!rb_respond_to (jid, rb_intern ("to_s"))) {
         rb_raise (rb_eArgError, "jid should respond to to_s");
@@ -265,7 +278,7 @@ ev_conn_set_jid (VALUE self, VALUE jid)
 static VALUE
 ev_conn_get_port (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     guint port = 0;
     LM_CALL2 (lm_connection_get_port (conn), port)
@@ -275,7 +288,7 @@ ev_conn_get_port (VALUE self)
 static VALUE
 ev_conn_set_port (VALUE self, VALUE port)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     LM_CALL (lm_connection_set_port (conn, NUM2UINT (port)));
 
@@ -285,7 +298,7 @@ ev_conn_set_port (VALUE self, VALUE port)
 static VALUE
 ev_conn_get_ssl (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     LmSSL * ssl = NULL;
     LM_CALL2 (lm_connection_get_ssl (conn), ssl);
@@ -295,7 +308,7 @@ ev_conn_get_ssl (VALUE self)
 static VALUE
 ev_conn_set_ssl (VALUE self, VALUE ssl_rval)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
     LmSSL        *ssl  = rb_lm_ssl_from_ruby_object (ssl_rval);
 
     LM_CALL (lm_connection_set_ssl (conn, ssl));
@@ -306,7 +319,7 @@ ev_conn_set_ssl (VALUE self, VALUE ssl_rval)
 static VALUE
 ev_conn_get_proxy (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     LmProxy * proxy = NULL;
     LM_CALL2 (lm_connection_get_proxy (conn), proxy);
@@ -316,7 +329,7 @@ ev_conn_get_proxy (VALUE self)
 static VALUE
 ev_conn_set_proxy (VALUE self, VALUE proxy_rval)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
     LmProxy      *proxy = rb_lm_proxy_from_ruby_object (proxy_rval);
 
     LM_CALL (lm_connection_set_proxy (conn, proxy));
@@ -327,7 +340,7 @@ ev_conn_set_proxy (VALUE self, VALUE proxy_rval)
 static VALUE
 ev_conn_set_disconnect_handler (int argc, VALUE *argv, VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
     VALUE         func;
 
     rb_scan_args (argc, argv, "0&", &func);
@@ -349,7 +362,7 @@ ev_conn_send (int argc, VALUE *argv, VALUE self)
 
     rb_scan_args(argc, argv, "1&", &msg, &block);
 
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
     LmMessage    *m = rb_lm_message_from_ruby_object (msg);
 
     if (!NIL_P(block)) {
@@ -374,7 +387,7 @@ ev_conn_send_with_reply (int argc, VALUE *argv, VALUE self)
 
     rb_scan_args(argc, argv, "1&", &msg, &block);
 
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
     LmMessage    *m = rb_lm_message_from_ruby_object (msg);
 
     if (NIL_P (block)) block = Cempty_block; /* Replace current handler with an empty one */
@@ -417,7 +430,7 @@ _do_send_with_reply (VALUE self, LmConnection *conn, LmMessage *msg, VALUE block
 static VALUE
 ev_conn_get_state (VALUE self)
 {
-    LmConnection *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection *conn = rb_lm_ev_connection_from_ruby_object (self);
 
     LmConnectionState state;
     LM_CALL2 (lm_connection_get_state (conn), state);
@@ -427,7 +440,7 @@ ev_conn_get_state (VALUE self)
 static VALUE
 ev_conn_add_msg_handler (int argc, VALUE *argv, VALUE self)
 {
-    LmConnection     *conn = rb_lm_connection_from_ruby_object (self);
+    LmConnection     *conn = rb_lm_ev_connection_from_ruby_object (self);
     VALUE             type, func;
     LmMessageHandler *handler;
 

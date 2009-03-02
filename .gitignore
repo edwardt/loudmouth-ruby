@@ -1,3 +1,7 @@
 *.o
 *.so
 Makefile
+.dep.inc
+nbproject/
+tags
+Makefile-loudmouth-ruby.mk
