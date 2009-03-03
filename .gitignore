@@ -5,3 +5,5 @@ Makefile
 nbproject/
 tags
 Makefile-loudmouth-ruby.mk
+.DS_Store
+loudmouth.bundle

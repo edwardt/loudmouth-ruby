@@ -118,7 +118,6 @@ ev_conn_close (VALUE self)
     return GBOOL2RVAL (res);
 }
 
-
 static VALUE
 ev_conn_auth (int argc, VALUE *argv, VALUE self)
 {

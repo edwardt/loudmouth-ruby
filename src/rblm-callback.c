@@ -26,7 +26,18 @@ create_async_message (LmAsyncNotification notification, VALUE block, gpointer da
 static void
 callback_free (LmAsyncCallback* cb)
 {
-    if (cb) free (cb);
+    switch (cb->notification)
+    {
+        case LM_CB_MSG:
+        case LM_CB_REPLY:
+        {
+            lm_message_unref ((LmMessage*)cb->data);
+            break;
+        }
+        default:
+            break;
+    }
+    free (cb);
 }
 
 /* Convert raw async message to ruby object */
@@ -37,17 +48,6 @@ lm_callback_to_ruby_object (LmAsyncCallback* cb)
         return Data_Wrap_Struct (lm_cCallback, NULL, callback_free, cb);
     else
         return Qnil;
-}
-
-static VALUE
-callback_allocate (VALUE klass)
-{
-    return Data_Wrap_Struct (klass, NULL, callback_free, NULL);
-}
-
-static VALUE
-callback_initialize (int argc, VALUE *argv, VALUE self)
-{
 }
 
 static LmAsyncCallback *
@@ -128,8 +128,6 @@ Init_lm_callback(VALUE lm_mLM)
     rb_define_const (lm_mLM, "CB_DISCONNECT", INT2FIX (LM_CB_DISCONNECT));
     rb_define_const (lm_mLM, "CB_SSL", INT2FIX (LM_CB_SSL));
 
-    rb_define_alloc_func (lm_cCallback, callback_allocate);
-    rb_define_method (lm_cCallback, "initialize", callback_initialize, -1);
     rb_define_method (lm_cCallback, "target", callback_get_target, 0);
     rb_define_method (lm_cCallback, "kind", callback_get_kind, 0);
     rb_define_method (lm_cCallback, "data", callback_get_data, 0);
