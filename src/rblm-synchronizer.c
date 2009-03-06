@@ -32,6 +32,9 @@ GIOChannel* lm2rb_write = NULL;
 /* Async message queue used to forward LM events to ruby */
 GAsyncQueue* lm2rb_queue = NULL;
 
+/* Pipe notification token */
+static gchar g_token = '1';
+
 /* Was GLib event loop thread started? */
 gboolean
 rblm_sync_started() {
@@ -51,13 +54,13 @@ rblm_create_pipe(GIOChannel** ch_read, GIOChannel** ch_write) {
         *ch_read = g_io_channel_unix_new(fd[0]);
         g_io_channel_set_encoding(*ch_read, NULL, NULL);
         g_io_channel_set_close_on_unref(*ch_read, TRUE);
-        /*g_io_channel_set_buffered(*ch_read, FALSE);*/
+        g_io_channel_set_buffered(*ch_read, FALSE);
     }
     if (ch_write) {
         *ch_write = g_io_channel_unix_new(fd[1]);
         g_io_channel_set_encoding(*ch_write, NULL, NULL);
         g_io_channel_set_close_on_unref(*ch_write, TRUE);
-        /*g_io_channel_set_buffered(*ch_write, FALSE);*/
+        g_io_channel_set_buffered(*ch_write, FALSE);
     }
 }
 
@@ -173,8 +176,7 @@ rb2lm_pause_glib()
         g_mutex_lock (cond_mx);
 
         GError* error = NULL;
-        g_io_channel_write_chars (rb2lm_write, "1", -1, NULL, &error);
-        if (!error) g_io_channel_flush (rb2lm_write, &error);
+        g_io_channel_write_chars (rb2lm_write, &g_token, 1, NULL, &error);
         if (error)
         {
           g_warning ("Failed to write into Ruby to Loudmouth pipe: %s\n", error->message);
@@ -206,12 +208,11 @@ notify_ruby (LmAsyncNotification notification,
     GError* error = NULL;
     LmAsyncCallback* cb = create_async_message (notification, block, data);
     g_async_queue_push (lm2rb_queue, (gpointer)cb);
-    if (g_io_channel_write_chars (lm2rb_write, "1", -1, &written, &error) == G_IO_STATUS_ERROR)
+    if (g_io_channel_write_chars (lm2rb_write, &g_token, 1, &written, &error) == G_IO_STATUS_ERROR)
     {
         g_error ("Failed to write to Loudmouth to Ruby pipe: %s\n", error->message);
         g_error_free (error);
     }
-    g_io_channel_flush (lm2rb_write, NULL);
 }
 
 /* Handlers that get called back by Loudmouth in GLib thread */
