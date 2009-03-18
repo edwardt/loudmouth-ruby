@@ -4,17 +4,24 @@ require 'rake/gempackagetask'
 CLEAN.include "ext/**/*.{bundle,o,so}"
 CLOBBER.include "ext/Makefile", "ext/mkmf.log", "pkg/**/*"
 
+GEM = 'loudmouth-ruby'
+GEM_VERSION = '0.3.0'
+AUTHORS = ['Joshua Sierles',
+           'Mikael Hallendal',
+           'Raphael Simon',
+           'Samuel Tesla',
+           'Kirk Haines']
+EMAIL = 'loudmouth-dev@googlegroups.com'
+HOMEPAGE = 'http://github.com/engineyard/loudmouth-ruby'
+SUMMARY = 'Ruby bindings to the Loudmouth XMPP library'
+
 gemspec = Gem::Specification.new do |s|
-  s.name = 'loudmouth-ruby'
-  s.homepage = 'http://github.com/engineyard/loudmouth-ruby'
-  s.summary = 'Ruby bindings to the Loudmouth XMPP library'
-  s.version = '0.3.0'
-  s.authors = ['Joshua Sierles',
-               'Mikael Hallendal',
-               'Raphael Simon',
-               'Samuel Tesla',
-               'Kirk Haines']
-  s.email = 'stesla@engineyard.com'
+  s.name = GEM
+  s.homepage = HOMEPAGE
+  s.summary = SUMMARY
+  s.version = GEM_VERSION
+  s.authors = AUTHORS
+  s.email = EMAIL
   s.extensions = ['ext/extconf.rb']
   s.files = FileList['README', 'COPYING', 'Rakefile',
                      '{examples,spec}/**/*', 'ext/*.{c,h,rb}']
