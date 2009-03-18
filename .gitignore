@@ -7,3 +7,4 @@ tags
 Makefile-loudmouth-ruby.mk
 .DS_Store
 loudmouth.bundle
+pkg/
