@@ -1,4 +1,4 @@
-require 'pkg-config'
+require File.join(File.dirname(__FILE__), 'pkg-config')
 
 PACKAGE_NAME = "loudmouth"
 PACKAGE_ID = "loudmouth"
